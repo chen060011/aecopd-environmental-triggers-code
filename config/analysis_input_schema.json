@@ -1,0 +1,38 @@
+{
+  "required_identifiers": {
+    "match_id": "Matched case-control set identifier",
+    "cluster_id": "Patient-level clustering identifier",
+    "is_case": "Case-day indicator encoded as 0 or 1",
+    "date": "Analysis date",
+    "county": "County-level exposure linkage key"
+  },
+  "event_anchor": {
+    "default_column": "onset_date",
+    "override_environment_variable": "AECOPD_EVENT_DATE_COL",
+    "rule": "The case date is the reconstructed symptom-onset date unless an alternative anchor is explicitly requested for sensitivity analysis."
+  },
+  "calendar_covariates": {
+    "public_holiday": "Public-holiday indicator encoded as 0 or 1",
+    "covid_major_wave": "Prespecified major-wave indicator encoded as 0 or 1"
+  },
+  "environmental_exposures": [
+    "PM25", "PM10", "SO2", "NO2", "CO", "O3",
+    "Tavg", "Tmax", "Tmin", "EHT", "ELT", "RHUM", "SHUM", "PRES"
+  ],
+  "influenza_exposures": [
+    "tests", "positive_tests", "positivity_rate",
+    "influenza_a_proportion", "influenza_b_proportion",
+    "a_h3n2_proportion", "a_h1n1_proportion", "a_unsubtyped_proportion",
+    "b_unclassified_proportion", "b_victoria_proportion", "b_yamagata_proportion",
+    "influenza_a_detections", "influenza_b_detections",
+    "a_h3n2_detections", "a_h1n1_detections", "a_unsubtyped_detections",
+    "b_unclassified_detections", "b_victoria_detections", "b_yamagata_detections"
+  ],
+  "subgroup_variables": [
+    "grp_age_3cat", "grp_sex", "grp_smoking_3cat", "grp_smoking_ever_never",
+    "grp_pack_years_4cat", "grp_cv_comorb", "grp_metabolic_comorb",
+    "grp_multimorbidity", "grp_symptom_dominant_4cat", "grp_bx_grp",
+    "grp_asthma_grp", "grp_emphysema_grp"
+  ],
+  "lag_naming": "Append _lag0 through _lag21 to each exposure used in distributed-lag models."
+}

@@ -1,0 +1,42 @@
+# Local inputs are supplied by the user and are never committed.
+data/
+results/
+figures/
+private/
+
+# Python and notebook artifacts
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# R artifacts
+.Rhistory
+.RData
+.Rproj.user/
+
+# Local configuration and credentials
+.env
+*.key
+*.pem
+*token*
+*secret*
+
+# Generated outputs
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.rds
+*.RData
+*.pdf
+*.png
+*.jpg
+*.jpeg
