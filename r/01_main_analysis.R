@@ -6,7 +6,7 @@ suppressPackageStartupMessages({
   library(sandwich)
 })
 
-CONTROL_STRATEGY <- "monthly_weekday"
+CONTROL_STRATEGY <- Sys.getenv("AECOPD_CONTROL_STRATEGY", "monthly_weekday")
 
 DATA_DIR <- Sys.getenv("AECOPD_DATA_DIR", ".")
 data_path <- Sys.getenv("AECOPD_ANALYSIS_INPUT", file.path(DATA_DIR, "analysis_input.csv"))
@@ -43,6 +43,7 @@ CLOGIT_LAGS <- 0:7
 MAX_LAG    <- 21
 FOCUS_LAGS <- 0:7
 FOCUS_WIN  <- c(0, 7)
+RUN_FLU_DLNM <- FALSE
 
 DF_VAR_TARGET <- 3
 DF_LAG        <- 4
@@ -60,11 +61,11 @@ RUN_TEMP_NL_DLNM <- TRUE
 TEMP_NL_DLNM_VARS <- c("Tavg", "Tmin", "Tmax")
 TEMP_NL_DLNM_MAX_LAG <- 21
 TEMP_NL_DLNM_DF_VAR <- 4
-TEMP_NL_DLNM_DF_LAG <- 4
+TEMP_NL_DLNM_DF_LAG <- 3
 TEMP_NL_DLNM_PRED_Q <- c(0.01, 0.99)
 TEMP_NL_DLNM_PRED_N <- 80
 
-RUN_POLLUTANT_LIN_DLNM <- TRUE
+RUN_POLLUTANT_LIN_DLNM <- FALSE
 POLLUTANT_LIN_DLNM_VARS <- c("PM25", "PM10", "NO2", "SO2", "CO", "O3")
 POLLUTANT_LIN_DLNM_MAX_LAG <- 21
 POLLUTANT_LIN_DLNM_DF_LAG <- 4
@@ -90,6 +91,9 @@ ANALYSIS_GROUP_VARS <- c(
   "grp_pack_years_4cat",
 
   "grp_symptom_dominant_4cat",
+  "grp_airway",
+  "grp_airway_strict",
+  "grp_never_smoker_airway",
   "grp_bx_grp",
   "grp_asthma_grp",
   "grp_emphysema_grp"
@@ -105,6 +109,9 @@ GROUP_VAR_LABEL_MAP <- c(
   "grp_smoking_ever_never" = "Smoking (ever/never)",
   "grp_pack_years_4cat" = "Pack-years (4-category)",
   "grp_symptom_dominant_4cat" = "Symptom-dominant group (4-category)",
+  "grp_airway" = "Airway-related symptom phenotype",
+  "grp_airway_strict" = "Strict airway-related symptom phenotype",
+  "grp_never_smoker_airway" = "Smoking-airway composite group",
   "grp_bx_grp" = "Background bronchiectasis",
   "grp_asthma_grp" = "Background asthma",
   "grp_emphysema_grp" = "Background emphysema"
@@ -228,8 +235,6 @@ MANUAL_SCALE_MAP <- c(
   "B_未分系数量" = 100,
   "B_Victoria数量" = 100,
   "B_Yamagata数量" = 1,
-  "PRES" = 10,
-
   "EHT" = 1,
   "ELT" = 1,
   "EHT_count_lag0_2" = 1,
@@ -253,6 +258,7 @@ calc_iqr <- function(x, var_name = NULL) {
 }
 
 GLOBAL_IQR_MAP <- c()
+CURRENT_IQR_MAP <- c()
 
 build_global_iqr_map <- function(df, base_vars, max_lag = 21) {
   out <- setNames(rep(NA_real_, length(base_vars)), base_vars)
@@ -278,13 +284,21 @@ build_global_iqr_map <- function(df, base_vars, max_lag = 21) {
   out
 }
 
-get_global_iqr <- function(base_var) {
+get_registered_global_iqr <- function(base_var) {
   if (!exists("GLOBAL_IQR_MAP", inherits = TRUE)) return(NA_real_)
   if (!(base_var %in% names(GLOBAL_IQR_MAP))) return(NA_real_)
 
   val <- suppressWarnings(as.numeric(GLOBAL_IQR_MAP[[base_var]]))
   if (!is.finite(val) || val <= 0) return(NA_real_)
   val
+}
+
+get_analysis_iqr <- function(base_var) {
+  if (base_var %in% names(CURRENT_IQR_MAP)) {
+    val <- suppressWarnings(as.numeric(CURRENT_IQR_MAP[[base_var]]))
+    if (is.finite(val) && val > 0) return(val)
+  }
+  get_registered_global_iqr(base_var)
 }
 
 get_cluster_var <- function(df, candidates = CLUSTER_CANDIDATES) {
@@ -302,7 +316,12 @@ get_scale_value <- function(data, base_var) {
     return(as.numeric(MANUAL_SCALE_MAP[[base_var]]))
   }
 
-  iqr_v <- get_global_iqr(base_var)
+  if (base_var %in% names(CURRENT_IQR_MAP)) {
+    current_iqr <- suppressWarnings(as.numeric(CURRENT_IQR_MAP[[base_var]]))
+    if (is.finite(current_iqr) && current_iqr > 0) return(current_iqr)
+  }
+
+  iqr_v <- get_analysis_iqr(base_var)
   if (is.finite(iqr_v) && iqr_v > 0) return(iqr_v)
 
   1
@@ -313,7 +332,12 @@ get_scale_label <- function(data, base_var) {
     return(paste0("per ", MANUAL_SCALE_MAP[[base_var]], "-unit"))
   }
 
-  iqr_v <- get_global_iqr(base_var)
+  if (base_var %in% names(CURRENT_IQR_MAP)) {
+    current_iqr <- suppressWarnings(as.numeric(CURRENT_IQR_MAP[[base_var]]))
+    if (is.finite(current_iqr) && current_iqr > 0) return("per IQR (current analysis subset)")
+  }
+
+  iqr_v <- get_analysis_iqr(base_var)
 
   if (is.finite(iqr_v) && iqr_v > 0) {
     return("per IQR (global)")
@@ -348,6 +372,15 @@ safe_coef_se <- function(fit, coef_name, cluster_vec = NULL) {
   }
 
   list(ok = TRUE, beta = beta, se = se)
+}
+
+get_model_vcov <- function(fit, cluster_vec = NULL) {
+  vv <- NULL
+  if (!is.null(cluster_vec) && requireNamespace("sandwich", quietly = TRUE)) {
+    vv <- tryCatch(sandwich::vcovCL(fit, cluster = cluster_vec), error = function(e) NULL)
+  }
+  if (is.null(vv)) vv <- tryCatch(vcov(fit), error = function(e) NULL)
+  vv
 }
 
 calc_p_from_logrr_se <- function(logrr, se) {
@@ -721,7 +754,7 @@ run_clogit_lags_0_7 <- function(df, base_var, lags = 0:7,
 
     beta <- coef_info$beta
     se   <- coef_info$se
-    iqr_k <- get_global_iqr(base_var)
+    iqr_k <- get_analysis_iqr(base_var)
 
     adjust_label <- build_flu_adjust_label(include_covid = TRUE, include_holiday = TRUE)
 
@@ -862,7 +895,7 @@ run_clogit_agg_exposures <- function(df, col_name,
 
   beta <- coef_info$beta
   se   <- coef_info$se
-  iqr_x <- get_global_iqr(base_var)
+  iqr_x <- get_analysis_iqr(base_var)
 
 
 
@@ -987,7 +1020,7 @@ run_one_dlnm <- function(df, base_var,
   } else {
     scale_value <- NA_real_
     scale_label <- "per IQR (global)"
-    iqr_val <- get_global_iqr(base_var)
+    iqr_val <- get_analysis_iqr(base_var)
     if (!is.finite(iqr_val) || iqr_val <= 0) return(list(ok = FALSE, error = "invalid global IQR"))
     delta <- iqr_val
   }
@@ -1233,7 +1266,7 @@ run_env_main_lag_models <- function(df, base_var,
 
     beta <- coef_info$beta
     se   <- coef_info$se
-    iqr_x <- get_global_iqr(base_var)
+    iqr_x <- get_analysis_iqr(base_var)
 
     aic_val <- tryCatch(AIC(fit), error = function(e) NA_real_)
 
@@ -1569,6 +1602,13 @@ run_temp_nl_dlnm_analysis <- function(df,
   if (is.null(fit)) {
     return(list(ok = FALSE, error = paste("clogit failed for", temp_var)))
   }
+  model_vcov <- get_model_vcov(
+    fit,
+    if (!is.null(cluster_var)) d$cluster else NULL
+  )
+  if (is.null(model_vcov)) {
+    return(list(ok = FALSE, error = paste("variance estimation failed for", temp_var)))
+  }
 
   pred_grid <- seq(pred_min, pred_max, length.out = pred_n)
 
@@ -1576,6 +1616,7 @@ run_temp_nl_dlnm_analysis <- function(df,
     crosspred(
       basis = cb,
       model = fit,
+      vcov = model_vcov,
       at = pred_grid,
       cen = ref_temp,
       bylag = 1,
@@ -1611,7 +1652,7 @@ run_temp_nl_dlnm_analysis <- function(df,
   lag_specific_days <- c(0, 1, 3, 5, 7, 14, 21)
   lag_specific_days <- lag_specific_days[lag_specific_days <= max_lag]
 
-  global_iqr_temp <- get_global_iqr(temp_var)
+  global_iqr_temp <- get_analysis_iqr(temp_var)
   ref_plus_iqr <- if (is.finite(global_iqr_temp) && global_iqr_temp > 0) {
     ref_temp + global_iqr_temp
   } else {
@@ -1625,6 +1666,7 @@ run_temp_nl_dlnm_analysis <- function(df,
       crosspred(
         basis = cb,
         model = fit,
+        vcov = model_vcov,
         at = ref_plus_iqr,
         cen = ref_temp,
         lag = lg
@@ -1786,7 +1828,7 @@ run_pollutant_linear_dlnm_analysis <- function(df,
   }
 
   ref_val <- median(x0_fin, na.rm = TRUE)
-  iqr_val <- get_global_iqr(pollutant_var)
+  iqr_val <- get_analysis_iqr(pollutant_var)
 
   scale_val <- get_scale_value(d, pollutant_var)
   scale_lab <- get_scale_label(d, pollutant_var)
@@ -2897,6 +2939,15 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   cat("开始分析子集: ", subset_tag, "\n")
   cat("=============================\n")
 
+  current_iqr_before <- CURRENT_IQR_MAP
+  CURRENT_IQR_MAP <<- c()
+  if (subset_tag %in% c("heating", "non_heating")) {
+    lag0_subset <- names(df_sub)[grepl("_lag0$", names(df_sub))]
+    base_subset <- unique(gsub("_lag0$", "", lag0_subset))
+    CURRENT_IQR_MAP <<- build_global_iqr_map(df_sub, base_subset, max_lag = MAX_LAG)
+  }
+  on.exit(CURRENT_IQR_MAP <<- current_iqr_before, add = TRUE)
+
   sub_output_dir <- file.path(output_dir_base, subset_tag)
   dir.create(sub_output_dir, showWarnings = FALSE, recursive = TRUE)
 
@@ -2961,9 +3012,17 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
 
   agg_cols_all <- names(df_sub)[Reduce(`|`, lapply(AGG_PATTERNS, function(p) grepl(p, names(df_sub))))]
   agg_cols_all <- agg_cols_all[!is.na(agg_cols_all)]
-  agg_cols_flu <- agg_cols_all[
-    sapply(agg_cols_all, function(x) any(startsWith(x, paste0(flu_exposure_vars, "_"))))
-  ]
+  if (length(agg_cols_all) > 0 && length(flu_exposure_vars) > 0) {
+    agg_cols_flu <- agg_cols_all[
+      vapply(
+        agg_cols_all,
+        function(x) any(startsWith(x, paste0(flu_exposure_vars, "_"))),
+        logical(1)
+      )
+    ]
+  } else {
+    agg_cols_flu <- character()
+  }
 
   df_sub <- make_required_multi_day_lags(
     df_sub,
@@ -2990,6 +3049,7 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
     if (isTRUE(rr1$ok) && nrow(rr1$res) > 0) flu_clogit_ok[[v]] <- rr1$res
     if (nrow(rr1$fail) > 0) flu_clogit_fail[[v]] <- rr1$fail
 
+    if (isTRUE(RUN_FLU_DLNM)) {
     rr2 <- run_one_dlnm(
       df_sub, v,
       max_lag = MAX_LAG, focus_lags = FOCUS_LAGS, focus_win = FOCUS_WIN,
@@ -3018,6 +3078,7 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
       flu_dlnm_meta[[paste0(v, "_iqr")]] <- rr3$meta
     } else {
       flu_dlnm_fail[[paste0(v, "_iqr")]] <- tibble(variable = v, effect_type = "per_iqr", reason = rr3$error)
+    }
     }
   }
 
@@ -3593,9 +3654,8 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
     "2) 环境模型只调整 阳性率_avg_lag0_2，不再同时调整 阳性数_avg_lag0_2",
     "3) 不再做主lag筛选；全部 lag 结果均完整保留",
     "4) 温度保留非线性 DLNM",
-    "5) 污染物改为线性 distributed-lag 模型（argvar = lin, arglag = ns）",
-    "6) 支持 all / heating / non_heating / A-E 分组子集，且暴露-反应模型口径完全一致",
-    "7) 新增：CLOGIT lag2 的组间异质性检验（interaction / LRT）",
+    "5) 支持 all / heating / non_heating / prespecified subgroup 子集",
+    "6) CLOGIT lag2 使用组间异质性检验（interaction / LRT）",
     "",
     "Heating-season split for Changchun:",
     "Heating season: October 20 to April 6",
@@ -3610,7 +3670,7 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
     paste("Flu model adjustment:",
           paste0("ns(", FLU_TEMP_AVG_COL, ",", FLU_TEMP_DF, ") + ns(", FLU_RHUM_AVG_COL, ",", FLU_RHUM_DF, ") + public_holiday"),
           if (RUN_COVID_WAVE_ADJUST) "+ covid_major_wave" else ""),
-    "Flu analyses: CLOGIT lag0-7 + old aggregate exposures + DLNM + lag2 interaction test",
+    "Flu analyses: CLOGIT lag0-7 + prespecified aggregate exposures + lag2 interaction test",
     "",
     "Strategy B: Environmental exposures as primary exposure",
     paste("Environmental primary exposures:", paste(env_exposure_vars, collapse = ", ")),
@@ -3621,16 +3681,13 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
     "  - Extreme temperature count indicators (EHT_count_lag0_2 / ELT_count_lag0_2): ns(RHUM_avg_lag0_2, 3) + public_holiday + covid_major_wave + 阳性率_avg_lag0_2",
     paste("Environmental candidate lags:", "lag0-lag7, and moving averages lag0-1 to lag0-7"),
     "Temperature secondary model: nonlinear DLNM (lag 0-21)",
-    "Pollutant secondary model: linear distributed-lag model (lag 0-21)",
     "Environmental lag2 interaction: CLOGIT lag2 with exposure × group_var",
     "",
     "Outputs:",
     paste0("1) 流感主暴露_CLOGIT_lag0-7_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("2) 流感主暴露_DLNM_cumulative_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("3) 环境主暴露_CLOGIT_all_lags_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("4) 温度非线性DLNM_总体累积效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("5) 污染物线性distributedlag_累计效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("6) lag2_组间异质性检验_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
+    paste0("2) 环境主暴露_CLOGIT_all_lags_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
+    paste0("3) 温度非线性DLNM_总体累积效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
+    paste0("4) lag2_组间异质性检验_", subset_tag, "_", CONTROL_STRATEGY, ".csv")
   )
 
   writeLines(report, file.path(sub_output_dir, paste0("分析报告_dual_strategy_", subset_tag, "_", CONTROL_STRATEGY, ".txt")))
@@ -3639,10 +3696,8 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   cat("当前子集: ", subset_tag, "\n")
   cat("优先看：\n")
   cat(" - ", paste0("流感主暴露_CLOGIT_lag0-7_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("流感主暴露_DLNM_cumulative_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
   cat(" - ", paste0("环境主暴露_CLOGIT_all_lags_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
   cat(" - ", paste0("温度非线性DLNM_总体累积效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("污染物线性distributedlag_累计效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
   cat(" - ", paste0("lag2_组间异质性检验_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
 
   invisible(list(
@@ -4143,9 +4198,18 @@ cat("数据维度: ", nrow(df), " x ", ncol(df), "\n")
 pres_cols <- grep("^PRES(_lag[0-9]+|_avg_lag0_[0-9]+|_max_lag0_[0-9]+)?$", names(df), value = TRUE)
 
 if (length(pres_cols) > 0) {
-  df <- df %>%
-    mutate(across(all_of(pres_cols), ~ suppressWarnings(as.numeric(.x)) / 100))
-  cat("PRES相关列已由 Pa 转换为 hPa，共转换列数: ", length(pres_cols), "\n")
+  converted <- character()
+  for (col in pres_cols) {
+    x <- suppressWarnings(as.numeric(df[[col]]))
+    typical <- suppressWarnings(median(abs(x), na.rm = TRUE))
+    if (is.finite(typical) && typical > 2000) {
+      df[[col]] <- x / 100
+      converted <- c(converted, col)
+    } else {
+      df[[col]] <- x
+    }
+  }
+  cat("PRES相关列单位检查完成；由 Pa 转换为 hPa 的列数: ", length(converted), "\n")
 }
 
 lag0_cols_all <- names(df)[grepl("_lag0$", names(df))]

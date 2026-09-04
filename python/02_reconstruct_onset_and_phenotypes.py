@@ -41,8 +41,10 @@ def derive(data: pd.DataFrame, visit_date: str, duration: str, max_duration: int
     data = data.copy()
     data[visit_date] = pd.to_datetime(data[visit_date], errors="coerce").dt.normalize()
     data[duration] = pd.to_numeric(data[duration], errors="coerce")
-    valid = data[duration].between(0, max_duration, inclusive="both") & data[visit_date].notna()
+    integer_days = data[duration].notna() & np.isclose(data[duration], np.round(data[duration]))
+    valid = integer_days & data[duration].between(0, max_duration, inclusive="both") & data[visit_date].notna()
     data = data.loc[valid].copy()
+    data[duration] = data[duration].round().astype(int)
     data["onset_date"] = data[visit_date] - pd.to_timedelta(data[duration], unit="D")
     data["event_date"] = data["onset_date"]
 
@@ -56,7 +58,12 @@ def derive(data: pd.DataFrame, visit_date: str, duration: str, max_duration: int
         data["grp_smoking_ever_never"] = smoking.map({"never": "never", "former": "ever", "current": "ever"})
     if "smoking_pack_years" in data:
         pack_years = pd.to_numeric(data["smoking_pack_years"], errors="coerce")
-        data["grp_pack_years_4cat"] = pd.cut(pack_years, [-np.inf, 0, 20, 40, np.inf], right=False, labels=["0", "gt0_lt20", "20_lt40", "40_or_more"])
+        group = pd.Series(pd.NA, index=data.index, dtype="object")
+        group.loc[pack_years.eq(0)] = "0"
+        group.loc[pack_years.gt(0) & pack_years.lt(20)] = "gt0_lt20"
+        group.loc[pack_years.ge(20) & pack_years.lt(40)] = "20_lt40"
+        group.loc[pack_years.ge(40)] = "40_or_more"
+        data["grp_pack_years_4cat"] = group
 
     available = [f"comorbidity_{name}" for name in COMORBIDITIES if f"comorbidity_{name}" in data]
     if available:
@@ -85,9 +92,29 @@ def derive(data: pd.DataFrame, visit_date: str, duration: str, max_duration: int
     if airway:
         values = pd.concat([positive(data[c]) for c in airway], axis=1)
         group = pd.Series(pd.NA, index=data.index, dtype="object")
-        group.loc[values.eq(True).any(axis=1)] = "airway"
-        group.loc[values.eq(False).all(axis=1)] = "non_airway"
+        sufficiently_observed = values.notna().sum(axis=1) >= 2
+        group.loc[sufficiently_observed & values.eq(True).any(axis=1)] = "airway"
+        group.loc[sufficiently_observed & ~values.eq(True).any(axis=1)] = "non_airway"
         data["grp_airway"] = group
+        strict = pd.Series(pd.NA, index=data.index, dtype="object")
+        positive_count = values.eq(True).sum(axis=1)
+        strict.loc[sufficiently_observed & positive_count.ge(2)] = "airway_strict"
+        strict.loc[sufficiently_observed & positive_count.lt(2)] = "non_airway_strict"
+        data["grp_airway_strict"] = strict
+    if {"grp_smoking_ever_never", "grp_airway"}.issubset(data.columns):
+        composite = pd.Series(pd.NA, index=data.index, dtype="object")
+        labels = {
+            ("never", "airway"): "never_airway",
+            ("never", "non_airway"): "never_non_airway",
+            ("ever", "airway"): "ever_airway",
+            ("ever", "non_airway"): "ever_non_airway",
+        }
+        for (smoking, airway_value), label in labels.items():
+            composite.loc[
+                data["grp_smoking_ever_never"].eq(smoking)
+                & data["grp_airway"].eq(airway_value)
+            ] = label
+        data["grp_never_smoker_airway"] = composite
     for name, group in [("bronchiectasis", "grp_bx_grp"), ("asthma", "grp_asthma_grp"), ("emphysema", "grp_emphysema_grp")]:
         column = f"comorbidity_{name}"
         if column in data:

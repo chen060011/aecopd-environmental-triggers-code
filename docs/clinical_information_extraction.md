@@ -1,30 +1,54 @@
 # Clinical information extraction
 
-`python/01_extract_ehr_information.py` is the public, sample-free interface for the restricted EHR extraction stage. It does not contain records, prompts with real patients, credentials, or private endpoints.
+`python/01_extract_ehr_information.py` extracts three groups of variables from clinical narratives:
 
-## Extracted domains
+- acute-exacerbation duration and eight symptom domains;
+- smoking status and quantitative smoking history;
+- sixteen comorbidity indicators.
 
-The output schema contains:
+The production workflow uses Gemma 3 (`gemma3:27b-it-qat`) through the Ollama generate API for structured extraction across the entire cohort. Each task is submitted once per record. Failed requests are retried up to three times with increasing timeouts. The model-comparison workflow is described in `config/llm_model_registry.json`.
 
-- acute symptom duration in days;
-- cough, sputum, dyspnea, wheeze, chest tightness, fever, fatigue, and nocturnal symptoms;
-- smoking status, smoking years, cigarettes per day, cessation years, and pack-years;
-- diabetes, hyperlipidemia, hypertension, coronary heart disease, heart failure, atrial fibrillation, stroke, anxiety/depression, osteoporosis, gastroesophageal reflux, asthma, emphysema, bronchiectasis, lung cancer, pulmonary embolism, renal insufficiency, hepatic insufficiency, and anemia.
+## Input columns
 
-The extractor only accepts explicitly documented information. Unmentioned symptoms and comorbidities remain `null`; they are not converted to negative findings. Smoking status is constrained to `never`, `former`, `current`, or `null`.
+The default text columns are:
+
+- `chief_complaint`;
+- `present_illness`;
+- `past_history`;
+- `吸烟史`.
+
+Alternative column names can be supplied with command-line arguments.
 
 ## Usage
 
+Start Ollama with the Gemma 3 model available, then run:
+
 ```text
 python python/01_extract_ehr_information.py \
-  --input <deidentified-clinical-table> \
+  --input <clinical-table.xlsx> \
   --output <extracted-variables.csv> \
-  --text-columns chief_complaint present_illness past_history \
-  --retain-columns record_key event_date
+  --retain-columns record_key visit_date
 ```
 
-The endpoint and model can be overridden with `--endpoint` and `--model`. The default endpoint is a loopback Ollama-compatible endpoint. No remote API credential is required by this repository.
+Available options include:
 
-## Governance boundary
+```text
+--chief-complaint <column>
+--present-illness <column>
+--past-history <column>
+--smoking-history <column>
+--model <model-name>
+--endpoint <ollama-generate-endpoint>
+--timeout 120
+--retries 3
+```
 
-The input table must be de-identified and approved for the analysis. Do not commit raw clinical text, model responses, manually adjudicated rows, patient identifiers, residence information, or record-level intermediate files. Use `04_evaluate_llm_extraction.py` only with an approved reference/prediction table stored outside the repository.
+The output contains only the columns requested through `--retain-columns` and the structured extraction fields. Source narratives are not copied automatically.
+
+## Missing values
+
+- Symptom information that cannot be assessed is returned as `null`.
+- Smoking status is standardized to `never`, `former`, `current`, or `null`.
+- Quantitative smoking fields are set to zero only for an explicitly documented never smoker; otherwise unavailable values remain `null`.
+- Comorbidity fields use `1`, `0`, or `null`.
+- Hour-level and multiple-duration expressions are flagged for review.

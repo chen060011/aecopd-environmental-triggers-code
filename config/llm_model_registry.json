@@ -1,0 +1,23 @@
+{
+  "production_extraction": {
+    "interface": "Ollama generate API",
+    "model": "gemma3:27b-it-qat",
+    "calls_per_task": 1,
+    "tasks": ["symptoms", "smoking", "comorbidities"],
+    "decoding": {"temperature": 0.1, "max_tokens": 2000},
+    "retry": {"max_attempts": 3, "base_timeout_seconds": 120, "retry_delay_seconds": 3, "backoff_factor": 1.5}
+  },
+  "benchmark": {
+    "records": 1000,
+    "runs_per_task": 3,
+    "models": [
+      {"alias": "Gemma 3", "tag": "gemma3:27b-it-qat"},
+      {"alias": "DeepSeek-R1", "tag": "deepseek-r1:14b"},
+      {"alias": "Llama 3.1", "tag": "llama3.1:8b"},
+      {"alias": "GPT-OSS", "tag": "gpt-oss:20b"},
+      {"alias": "Qwen3", "tag": "qwen3:8b"},
+      {"alias": "Ministral", "tag": "hf.co/unsloth/Ministral-3-14B-Instruct-2512-GGUF:Q4_K_M"},
+      {"alias": "Phi-4", "tag": "phi4:latest"}
+    ]
+  }
+}

@@ -31,8 +31,9 @@
   "subgroup_variables": [
     "grp_age_3cat", "grp_sex", "grp_smoking_3cat", "grp_smoking_ever_never",
     "grp_pack_years_4cat", "grp_cv_comorb", "grp_metabolic_comorb",
-    "grp_multimorbidity", "grp_symptom_dominant_4cat", "grp_bx_grp",
+    "grp_multimorbidity", "grp_symptom_dominant_4cat", "grp_airway",
+    "grp_airway_strict", "grp_never_smoker_airway", "grp_bx_grp",
     "grp_asthma_grp", "grp_emphysema_grp"
   ],
-  "lag_naming": "Append _lag0 through _lag21 to each exposure used in distributed-lag models."
+  "lag_naming": "Append _lag0 through _lag21. Single-day primary models use lag0-lag7; temperature DLNM uses lag0-lag21; moving-average sensitivity variables use avg_lag0_1 through avg_lag0_7."
 }

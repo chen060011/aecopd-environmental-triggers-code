@@ -1,16 +1,17 @@
-import os
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from datetime import timedelta
-import warnings
-import concurrent.futures
-from tqdm import tqdm
-import time
-import hashlib
-import re
 import calendar
+import concurrent.futures
+import hashlib
+import os
+import re
+import time
+import warnings
+from datetime import timedelta
+from pathlib import Path
+
 import chinese_calendar as cc
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
 
 warnings.filterwarnings("ignore")
 
@@ -33,18 +34,24 @@ CONTROL_CONFIGS = [
     {
         "strategy": "monthly_weekday",
         "direction": "both",
-        "max_controls": 4,
+        "max_controls": None,
+        "symmetric_weeks": [1, 2, 3],
+    },
+    {
+        "strategy": "symmetric_weekday",
+        "direction": "both",
+        "max_controls": None,
         "symmetric_weeks": [1, 2, 3],
     },
 ]
 
 THREAD_NUM = 8
-LAGS = list(range(int(os.getenv("AECOPD_MAX_LAG", "35")) + 1))
+LAGS = list(range(int(os.getenv("AECOPD_MAX_LAG", "21")) + 1))
 FLU_REGION = "north"
 CLIP_METEO_BY_PATIENT_WINDOW = False
 
-FLU_INTERPOLATE_TO_DAILY = False
-FLU_INTERP_BOUNDARY = "clip"        # "clip" or "extend"
+FLU_INTERPOLATE_TO_DAILY = True
+FLU_INTERP_BOUNDARY = "clip"
 
 EXTREME_TEMP_METHOD = "percentile"
 EXTREME_HEAT_PERCENTILE = 95
@@ -98,6 +105,9 @@ ANALYSIS_GROUP_COLS = [
     "grp_smoking_ever_never",
     "grp_pack_years_4cat",
     "grp_symptom_dominant_4cat",
+    "grp_airway",
+    "grp_airway_strict",
+    "grp_never_smoker_airway",
     "grp_bx_grp",
     "grp_asthma_grp",
     "grp_emphysema_grp",
@@ -272,7 +282,7 @@ def get_calendar_flags(date_val) -> dict:
             "is_workday": int(cc.is_workday(d)),
             "is_weekend": int(dt.weekday() >= 5),
         }
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {
             "public_holiday": np.nan,
             "is_workday": np.nan,
@@ -542,14 +552,14 @@ def add_ai_phenotypes(df_in: pd.DataFrame) -> pd.DataFrame:
     df["chest_tightness_present"] = _is_present_severe(df[chest_col]) if chest_col in df.columns else pd.Series(np.nan, index=df.index)
     df["night_symptom_present"] = _is_present_severe(df[night_col]) if night_col in df.columns else pd.Series(np.nan, index=df.index)
 
-    airway_sum = df[["wheeze_present", "chest_tightness_present", "night_symptom_present"]].fillna(0).sum(axis=1)
+    airway_sum = df[["wheeze_present", "chest_tightness_present", "night_symptom_present"]].sum(axis=1, min_count=2)
     airway_nonmissing_n = df[["wheeze_present", "chest_tightness_present", "night_symptom_present"]].notna().sum(axis=1)
 
-    df["airway_reactive_score"] = np.where(airway_nonmissing_n > 0, airway_sum, np.nan)
+    df["airway_reactive_score"] = np.where(airway_nonmissing_n >= 2, airway_sum, np.nan)
 
     df["airway_reactive_pheno"] = pd.Series(pd.NA, index=df.index, dtype="object")
-    df.loc[airway_nonmissing_n > 0, "airway_reactive_pheno"] = "Non-airway-reactive"
-    df.loc[(airway_nonmissing_n > 0) & (airway_sum >= 1), "airway_reactive_pheno"] = "Airway-reactive"
+    df.loc[airway_nonmissing_n >= 2, "airway_reactive_pheno"] = "Non-airway-reactive"
+    df.loc[(airway_nonmissing_n >= 2) & (airway_sum >= 1), "airway_reactive_pheno"] = "Airway-reactive"
 
     df["airway_reactive_pheno_strict"] = pd.Series(pd.NA, index=df.index, dtype="object")
     df.loc[airway_nonmissing_n >= 2, "airway_reactive_pheno_strict"] = "Non-airway-reactive"
@@ -642,9 +652,9 @@ def add_all_analysis_groups(df_in: pd.DataFrame) -> pd.DataFrame:
         df["grp_symptom_burden"] = burden
 
     if {"sym_fever", "sym_sputum"}.issubset(df.columns):
-        infective = ((df["sym_fever"] == 1) | (df["sym_sputum"] == 1))
-        infective_known = df[["sym_fever", "sym_sputum"]].notna().any(axis=1)
-        infective_score = df[["sym_fever", "sym_sputum"]].sum(axis=1, min_count=1)
+        infective_known = df[["sym_fever", "sym_sputum"]].notna().all(axis=1)
+        infective = infective_known & ((df["sym_fever"] == 1) | (df["sym_sputum"] == 1))
+        infective_score = df[["sym_fever", "sym_sputum"]].sum(axis=1, min_count=2)
 
         infective_grp = pd.Series(pd.NA, index=df.index, dtype="object")
         infective_grp.loc[infective] = "Infective"
@@ -658,18 +668,23 @@ def add_all_analysis_groups(df_in: pd.DataFrame) -> pd.DataFrame:
         df["grp_infective_3cat"] = infective_3cat
 
     if {"sym_wheeze", "sym_chest", "sym_night"}.issubset(df.columns):
-        airway = (
+        airway_known = df[["sym_wheeze", "sym_chest", "sym_night"]].notna().sum(axis=1) >= 2
+        airway = airway_known & (
             (df["sym_wheeze"] == 1) |
             (df["sym_chest"] == 1) |
             (df["sym_night"] == 1)
         )
-        airway_known = df[["sym_wheeze", "sym_chest", "sym_night"]].notna().any(axis=1)
-        airway_score = df[["sym_wheeze", "sym_chest", "sym_night"]].sum(axis=1, min_count=1)
+        airway_score = df[["sym_wheeze", "sym_chest", "sym_night"]].sum(axis=1, min_count=2)
 
         airway_grp = pd.Series(pd.NA, index=df.index, dtype="object")
         airway_grp.loc[airway] = "Airway-reactive"
         airway_grp.loc[airway_known & ~airway] = "Non-airway-reactive"
         df["grp_airway"] = airway_grp
+
+        strict = pd.Series(pd.NA, index=df.index, dtype="object")
+        strict.loc[airway_known & airway_score.ge(2)] = "Airway-reactive-strict"
+        strict.loc[airway_known & airway_score.lt(2)] = "Non-airway-reactive-strict"
+        df["grp_airway_strict"] = strict
 
         airway_score_grp = pd.Series(pd.NA, index=df.index, dtype="object")
         airway_score_grp.loc[airway_score == 0] = "0"
@@ -699,27 +714,36 @@ def add_all_analysis_groups(df_in: pd.DataFrame) -> pd.DataFrame:
         df["grp_event_4cat"] = event4
 
     if {"sym_dyspnea", "grp_infective"}.issubset(df.columns):
-        grp = pd.Series("Other", index=df.index, dtype="object")
+        grp = pd.Series(pd.NA, index=df.index, dtype="object")
         grp.loc[
-            (df["sym_dyspnea"].fillna(0) == 1) &
+            (df["sym_dyspnea"] == 1) &
             (df["grp_infective"] == "Non-infective")
         ] = "Dyspnea-dominant"
+        grp.loc[df["grp_infective"].notna() & ~(
+            (df["sym_dyspnea"] == 1) & (df["grp_infective"] == "Non-infective")
+        )] = "Other"
         df["grp_dyspnea_dominant"] = grp
 
     if {"sym_cough", "sym_sputum"}.issubset(df.columns):
-        grp = pd.Series("No", index=df.index, dtype="object")
+        grp = pd.Series(pd.NA, index=df.index, dtype="object")
         grp.loc[
-            (df["sym_cough"].fillna(0) == 1) &
-            (df["sym_sputum"].fillna(0) == 1)
+            (df["sym_cough"] == 1) & (df["sym_sputum"] == 1)
         ] = "Yes"
+        complete = df[["sym_cough", "sym_sputum"]].notna().all(axis=1)
+        grp.loc[complete & ~(
+            (df["sym_cough"] == 1) & (df["sym_sputum"] == 1)
+        )] = "No"
         df["grp_chronic_bronchitic_proxy"] = grp
 
     if {"sym_fever", "sym_fatigue"}.issubset(df.columns):
-        grp = pd.Series("No", index=df.index, dtype="object")
+        grp = pd.Series(pd.NA, index=df.index, dtype="object")
         grp.loc[
-            (df["sym_fever"].fillna(0) == 1) |
-            (df["sym_fatigue"].fillna(0) == 1)
+            (df["sym_fever"] == 1) | (df["sym_fatigue"] == 1)
         ] = "Yes"
+        complete = df[["sym_fever", "sym_fatigue"]].notna().all(axis=1)
+        grp.loc[complete & ~(
+            (df["sym_fever"] == 1) | (df["sym_fatigue"] == 1)
+        )] = "No"
         df["grp_systemic_proxy"] = grp
 
     simple_binary_cols = {
@@ -790,7 +814,7 @@ def add_all_analysis_groups(df_in: pd.DataFrame) -> pd.DataFrame:
     all_com_cols = [c for c in [
         "com_dm", "com_htn", "com_hld", "com_chd", "com_hf", "com_af", "com_stroke",
         "com_anxdep", "com_osteo", "com_gerd", "com_bx", "com_lungca", "com_pe",
-        "com_renal", "com_hepatic", "com_anemia", "grp_asthma"
+        "com_renal", "com_hepatic", "com_anemia", "grp_asthma", "grp_emphysema"
     ] if c in df.columns]
 
     if all_com_cols:
@@ -1031,9 +1055,29 @@ class DataLoader:
     @staticmethod
     def load_temperature_data(path: Path) -> pd.DataFrame:
         print(f"1.1 加载气温数据: {path.name}")
-        df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+        df = pd.read_excel(path) if path.suffix.lower() in {".xlsx", ".xls"} else pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
         df = _flatten_columns(df)
         df = _dedupe_columns(df)
+
+        if "date" in df.columns and any(column in df.columns for column in TEMPERATURE_BASE_VARS):
+            if "county_name" not in df.columns:
+                df = df.rename(columns={_pick_county_col(df): "county_name"})
+            df["date"] = _normalize_date_series(df["date"])
+            for column in TEMPERATURE_BASE_VARS:
+                if column in df.columns:
+                    df[column] = pd.to_numeric(df[column], errors="coerce")
+            daily_temp = df[["county_name", "date"] + [column for column in TEMPERATURE_BASE_VARS if column in df.columns]].copy()
+            daily_temp = daily_temp.groupby(["county_name", "date"], as_index=False).mean(numeric_only=True)
+            if not {"Tmax", "Tmin"}.issubset(daily_temp.columns):
+                raise ValueError("Long-format temperature input must contain Tavg, Tmax and Tmin")
+            daily_temp = add_extreme_temperature_flags(
+                daily_temp,
+                method=EXTREME_TEMP_METHOD,
+                heat_percentile=EXTREME_HEAT_PERCENTILE,
+                cold_percentile=EXTREME_COLD_PERCENTILE,
+                by_county=EXTREME_TEMP_BY_COUNTY,
+            )
+            return daily_temp
 
         if "county_name" not in df.columns:
             ccol = _pick_county_col(df)
@@ -1114,8 +1158,15 @@ class DataLoader:
     @staticmethod
     def load_pollutant_data(path: Path, pollutant_name: str) -> pd.DataFrame:
         print(f"1.2 加载{pollutant_name}数据: {path.name}")
-        df = DataLoader._read_excel_robust(path)
+        df = DataLoader._read_excel_robust(path) if path.suffix.lower() in {".xlsx", ".xls"} else pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+        df = _flatten_columns(df)
+        df = _dedupe_columns(df)
         df = DataLoader._prepare_county_name(df)
+
+        if "date" in df.columns and pollutant_name in df.columns:
+            df["date"] = _normalize_date_series(df["date"])
+            df[pollutant_name] = pd.to_numeric(df[pollutant_name], errors="coerce")
+            return df.groupby(["county_name", "date"], as_index=False)[pollutant_name].mean()
 
         drop_cols = {"county_name", "county_gb", "county_name__old"}
         date_cols = [c for c in df.columns if c not in drop_cols]
@@ -1143,12 +1194,17 @@ class DataLoader:
     @staticmethod
     def load_pivot_csv(path: Path, value_name: str) -> pd.DataFrame:
         print(f"加载{value_name}数据: {path.name}")
-        df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+        df = pd.read_excel(path) if path.suffix.lower() in {".xlsx", ".xls"} else pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
         df = _flatten_columns(df)
         df = df.dropna(axis=1, how="all")
         df = _dedupe_columns(df)
 
         df = DataLoader._prepare_county_name(df)
+
+        if "date" in df.columns and value_name in df.columns:
+            df["date"] = _normalize_date_series(df["date"])
+            df[value_name] = pd.to_numeric(df[value_name], errors="coerce")
+            return df.groupby(["county_name", "date"], as_index=False)[value_name].mean()
 
         drop_cols = {"county_name", "county_gb", "county_name__old"}
         date_cols = [c for c in df.columns if c not in drop_cols]
@@ -1251,7 +1307,7 @@ def merge_all_data_optimized(temperature_df, pollutant_dfs, humidity_dfs, pressu
 
     print(f"    初始数据（气温）: {merged_df.shape}")
 
-    for _, df in pollutant_dfs.items():
+    for df in pollutant_dfs.values():
         if df is not None and not df.empty:
             df = _normalize_date_col(df, "date")
             df["county_name"] = df["county_name"].astype(str).str.strip()
@@ -1259,7 +1315,7 @@ def merge_all_data_optimized(temperature_df, pollutant_dfs, humidity_dfs, pressu
             df = df[keep_cols].copy()
             merged_df = merged_df.merge(df, on=["county_name", "date"], how="left")
 
-    for _, df in humidity_dfs.items():
+    for df in humidity_dfs.values():
         if df is not None and not df.empty:
             df = _normalize_date_col(df, "date")
             df["county_name"] = df["county_name"].astype(str).str.strip()
@@ -1267,7 +1323,7 @@ def merge_all_data_optimized(temperature_df, pollutant_dfs, humidity_dfs, pressu
             df = df[keep_cols].copy()
             merged_df = merged_df.merge(df, on=["county_name", "date"], how="left")
 
-    for _, df in pressure_dfs.items():
+    for df in pressure_dfs.values():
         if df is not None and not df.empty:
             df = _normalize_date_col(df, "date")
             df["county_name"] = df["county_name"].astype(str).str.strip()
@@ -1406,7 +1462,9 @@ def add_patient_group_labels_optimized(pat_df: pd.DataFrame) -> pd.DataFrame:
         df["smoke_group"] = df["吸烟状态"].map(smoke_map)
 
     if "事件日" in df.columns:
-        df["season"] = np.where(df["事件日"].dt.month.between(4, 10), "温暖", "寒冷")
+        month_day = df["事件日"].dt.strftime("%m-%d")
+        heating = (month_day >= "10-20") | (month_day <= "04-06")
+        df["season"] = np.where(heating, "heating", "non_heating")
 
     return df
 
@@ -1487,13 +1545,17 @@ class ExposurePreprocessor:
                 exposure_data[f"{var}_avg_lag0_2"] = np.nan
                 exposure_data[f"{var}_max_lag0_2"] = np.nan
 
+            for window_end in range(1, min(7, len(lag_values) - 1) + 1):
+                window = lag_values[: window_end + 1]
+                valid_window = [x for x in window if not pd.isna(x)]
+                minimum_valid = 2 if window_end <= 2 else 4
+                exposure_data[f"{var}_avg_lag0_{window_end}"] = (
+                    float(np.nanmean(valid_window))
+                    if len(valid_window) >= minimum_valid else np.nan
+                )
+
             lag_0_7 = lag_values[:8]
             valid_0_7 = [x for x in lag_0_7 if not pd.isna(x)]
-
-            if len(valid_0_7) >= 4:
-                exposure_data[f"{var}_avg_lag0_7"] = float(np.nanmean(valid_0_7))
-            else:
-                exposure_data[f"{var}_avg_lag0_7"] = np.nan
 
             if var in binary_extreme_vars:
                 if len(valid_0_2) >= 2:
@@ -1542,10 +1604,10 @@ class BatchProcessor:
             if not isinstance(patient_event_dates, set):
                 patient_event_dates = set(pd.to_datetime(list(patient_event_dates), errors="coerce").dropna())
 
-            patient_event_dates = set(
+            patient_event_dates = {
                 pd.Timestamp(x).normalize()
                 for x in pd.to_datetime(list(patient_event_dates), errors="coerce").dropna()
-            )
+            }
 
             case_exposure = exposure_preprocessor.get_exposure(county_name, case_date)
             results.append(self._create_record(
@@ -1678,6 +1740,18 @@ def run_single_strategy(
         print(f"错误：策略 {strategy} 未生成任何病例/对照记录")
         return None
 
+    set_status = results_df.groupby("match_id")["is_case"].agg(
+        n_case=lambda values: int((values == 1).sum()),
+        n_control=lambda values: int((values == 0).sum()),
+    )
+    valid_sets = set_status.index[(set_status["n_case"] == 1) & (set_status["n_control"] >= 1)]
+    excluded_sets = int(set_status.shape[0] - len(valid_sets))
+    results_df = results_df[results_df["match_id"].isin(valid_sets)].copy()
+    print(f"    剔除无有效病例-对照组合的匹配集: {excluded_sets}")
+    if results_df.empty:
+        print(f"错误：策略 {strategy} 筛选后无有效匹配集")
+        return None
+
     sort_cols = [c for c in ["cluster_id", "match_id", "is_case", "date"] if c in results_df.columns]
     results_df = results_df.sort_values(sort_cols).reset_index(drop=True)
 
@@ -1750,7 +1824,7 @@ def run_single_strategy(
             miss = results_df[col].isna().mean() * 100
             print(f"    {col}: {miss:.1f}%")
 
-    eht_elt_cols = [c for c in results_df.columns if c.startswith("EHT_") or c.startswith("ELT_")]
+    eht_elt_cols = [c for c in results_df.columns if c.startswith(("EHT_", "ELT_"))]
     if eht_elt_cols:
         print("\n[检查] EHT / ELT 扩展变量：")
         print(eht_elt_cols)
@@ -1933,7 +2007,7 @@ def main():
         print(f"    对照冲突数: {s['conflict_controls']}")
 
     total_time = time.time() - global_start_time
-    print("\n总耗时: {:.2f}秒".format(total_time))
+    print(f"\n总耗时: {total_time:.2f}秒")
     print("=" * 88)
 
 if __name__ == "__main__":

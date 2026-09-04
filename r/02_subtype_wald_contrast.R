@@ -57,29 +57,6 @@ add_var_label <- function(v) {
   ifelse(is.na(out), v, out)
 }
 
-theme_pub <- function(base_size = 11) {
-  theme_classic(base_size = base_size) +
-    theme(
-      plot.title = element_text(face = "bold", size = base_size + 1, hjust = 0),
-      plot.subtitle = element_text(size = base_size - 1, hjust = 0),
-      axis.title = element_text(face = "bold"),
-      axis.text = element_text(color = "black"),
-      axis.line = element_line(linewidth = 0.4),
-      axis.ticks = element_line(linewidth = 0.4),
-      strip.background = element_blank(),
-      strip.text = element_text(face = "bold"),
-      legend.position = "top",
-      legend.title = element_blank(),
-      legend.key = element_blank(),
-      panel.grid = element_blank(),
-      plot.margin = margin(8, 10, 8, 8)
-    )
-}
-
-COL_H1 <- "#C23B22"   # 深红
-COL_H3 <- "#355C9A"   # 深蓝
-COL_CONTRAST <- "#3F3F3F"
-
 safe_is_finite <- function(x) is.finite(x) & !is.na(x)
 
 get_cluster_var <- function(df, candidates = CLUSTER_CANDIDATES) {

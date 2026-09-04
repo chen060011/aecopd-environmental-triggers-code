@@ -1,14 +1,18 @@
 {
   "duration_days": "number or null",
+  "duration_manual_review": "boolean",
+  "duration_review_reason": "hour_expression, multiple_duration_expressions, semicolon-delimited combination, or null",
+  "acute_exacerbation": "1, 0, or null",
+  "has_copd_history": "1, 0, or null",
   "symptoms": {
-    "cough": "present, absent, mild, severe, or null",
-    "sputum": "present, absent, mild, severe, or null",
-    "dyspnea": "present, absent, mild, severe, or null",
-    "wheeze": "present, absent, mild, severe, or null",
-    "chest_tightness": "present, absent, mild, severe, or null",
-    "fever": "present, absent, mild, severe, or null",
-    "fatigue": "present, absent, mild, severe, or null",
-    "nocturnal_symptoms": "present, absent, mild, severe, or null"
+    "cough": "mild, severe, or null",
+    "sputum": "mild, severe, or null",
+    "dyspnea": "present, absent, or null",
+    "wheeze": "present, absent, or null",
+    "chest_tightness": "present, absent, or null",
+    "fever": "present, absent, or null",
+    "fatigue": "present, absent, or null",
+    "nocturnal_symptoms": "present, absent, or null"
   },
   "smoking": {
     "status": "never, former, current, or null",
@@ -19,8 +23,8 @@
   },
   "comorbidities": {
     "diabetes": "1, 0, or null",
-    "hyperlipidemia": "1, 0, or null",
     "hypertension": "1, 0, or null",
+    "hyperlipidemia": "1, 0, or null",
     "coronary_heart_disease": "1, 0, or null",
     "heart_failure": "1, 0, or null",
     "atrial_fibrillation": "1, 0, or null",
@@ -28,8 +32,6 @@
     "anxiety_depression": "1, 0, or null",
     "osteoporosis": "1, 0, or null",
     "gastroesophageal_reflux": "1, 0, or null",
-    "asthma": "1, 0, or null",
-    "emphysema": "1, 0, or null",
     "bronchiectasis": "1, 0, or null",
     "lung_cancer": "1, 0, or null",
     "pulmonary_embolism": "1, 0, or null",
