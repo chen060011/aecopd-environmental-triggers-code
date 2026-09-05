@@ -1,3 +1,10 @@
+<img width="16816" height="11936" alt="GRAPHICAL ABSTRACT" src="https://github.com/user-attachments/assets/cfe74055-966a-4fcd-820a-ff98868d5d07" />
+
+GRAPHICAL ABSTRACT Overview of the study. EHR: electronic health record; LLM: large language model; OR: odds ratio; CI: confidence interval; CCVC: cardio-cerebrovascular comorbidity.
+
+
+
+
 # AECOPD environmental triggers
 
 Analysis code for the multicentre case-crossover study of acute exacerbations of COPD, reconstructed symptom onset, influenza activity, air pollution, meteorological exposures, and clinical susceptibility.
