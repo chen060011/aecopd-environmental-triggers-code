@@ -447,35 +447,6 @@ write.csv(
   file.path(output_dir, "H1N1_vs_H3N2_lag2_正式差异检验_极简表.csv"),
   row.names = FALSE
 )
-
-report <- c(
-  "=== Final publication-ready evidence for H1N1 vs H3N2 contrast ===",
-  paste("生成日期:", as.character(Sys.Date())),
-  paste("Control strategy:", CONTROL_STRATEGY),
-  paste("数据文件:", data_path),
-  paste("输出目录:", output_dir),
-  "",
-  "分析目标：",
-  "仅保留与正文关键句直接对应的证据链：",
-  "\"Wald 差异检验显示，在供暖期 lag 2 暴露窗口下，A(H1N1)pdm09 与 AECOPD 的关联显著强于 A(H3N2)\"",
-  "",
-  "模型形式：",
-  paste0(
-    "outcome ~ A_H1N1占比_lag2 + A_H3N2占比_lag2 + ns(",
-    FLU_TEMP_AVG_COL, ",", FLU_TEMP_DF, ") + ns(",
-    FLU_RHUM_AVG_COL, ",", FLU_RHUM_DF, ") + public_holiday",
-    if (RUN_COVID_WAVE_ADJUST) " + covid_major_wave" else "",
-    " + strata(match_id)"
-  ),
-  "",
-  "核心输出文件：",
-  "1) H1N1_vs_H3N2_lag2_正式差异检验_汇总表.csv",
-  "2) H1N1_vs_H3N2_lag2_正式差异检验_极简表.csv"
-)
-
-writeLines(report, file.path(output_dir, "README_final_H1N1_vs_H3N2_lag2.txt"))
-
-cat("\n全部完成。\n")
 cat("总输出目录: ", output_dir, "\n")
 cat("重点文件：\n")
 cat(" - H1N1_vs_H3N2_lag2_正式差异检验_极简表.csv\n")
