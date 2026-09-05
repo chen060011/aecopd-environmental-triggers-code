@@ -3099,17 +3099,6 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   flu_dlnm_meta_df <- if (length(flu_dlnm_meta) > 0) bind_rows(flu_dlnm_meta) else tibble()
   flu_dlnm_fail_df <- if (length(flu_dlnm_fail) > 0) bind_rows(flu_dlnm_fail) else tibble()
 
-  write.csv(flu_clogit_df, file.path(sub_output_dir, paste0("流感主暴露_CLOGIT_lag0-7_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(flu_clogit_fail_df, file.path(sub_output_dir, paste0("流感主暴露_CLOGIT_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(flu_agg_df, file.path(sub_output_dir, paste0("流感主暴露_聚合暴露CLOGIT_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(flu_agg_fail_df, file.path(sub_output_dir, paste0("流感主暴露_聚合暴露CLOGIT_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(flu_dlnm_lag_df, file.path(sub_output_dir, paste0("流感主暴露_DLNM_lag0-7_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(flu_dlnm_cum_df, file.path(sub_output_dir, paste0("流感主暴露_DLNM_cumulative_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(flu_dlnm_meta_df, file.path(sub_output_dir, paste0("流感主暴露_DLNM_basis_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(flu_dlnm_fail_df, file.path(sub_output_dir, paste0("流感主暴露_DLNM_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-
-  cat("\n2B) 环境主暴露模型（single-pollutant / single-meteorology case-crossover）...\n")
-
   env_main_ok <- list()
   env_main_fail <- list()
 
@@ -3152,10 +3141,6 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   env_main_df <- if (length(env_main_ok) > 0) bind_rows(env_main_ok) else tibble()
   env_main_fail_df <- if (length(env_main_fail) > 0) bind_rows(env_main_fail) else tibble()
 
-  write.csv(env_main_df, file.path(sub_output_dir, paste0("环境主暴露_CLOGIT_all_lags_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(env_main_fail_df, file.path(sub_output_dir, paste0("环境主暴露_CLOGIT_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-
-  cat("\n2C) 温度非线性DLNM分析...\n")
 
   temp_nl_overall_list <- list()
   temp_nl_lagspec_list <- list()
@@ -3166,7 +3151,6 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   if (isTRUE(RUN_TEMP_NL_DLNM) && length(temp_nl_dlnm_vars) > 0) {
     for (i in seq_along(temp_nl_dlnm_vars)) {
       tv <- temp_nl_dlnm_vars[i]
-      cat(sprintf("  [温度非线性DLNM %d/%d] %s\n", i, length(temp_nl_dlnm_vars), tv))
 
       rr <- run_temp_nl_dlnm_analysis(
         df = df_sub,
@@ -3198,13 +3182,6 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   temp_nl_meta_df <- if (length(temp_nl_meta_list) > 0) bind_rows(temp_nl_meta_list) else tibble()
   temp_nl_fail_df <- if (length(temp_nl_fail_list) > 0) bind_rows(temp_nl_fail_list) else tibble()
 
-  write.csv(temp_nl_overall_df, file.path(sub_output_dir, paste0("温度非线性DLNM_总体累积效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(temp_nl_lagspec_df, file.path(sub_output_dir, paste0("温度非线性DLNM_特定lag效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(temp_nl_contour_df, file.path(sub_output_dir, paste0("温度非线性DLNM_contour矩阵_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(temp_nl_meta_df, file.path(sub_output_dir, paste0("温度非线性DLNM_meta_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(temp_nl_fail_df, file.path(sub_output_dir, paste0("温度非线性DLNM_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-
-  cat("\n2D) 污染物线性distributed-lag分析...\n")
 
   pollutant_lag_all_list <- list()
   pollutant_lag_report_list <- list()
@@ -3215,7 +3192,6 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   if (isTRUE(RUN_POLLUTANT_LIN_DLNM) && length(pollutant_lin_dlnm_vars) > 0) {
     for (i in seq_along(pollutant_lin_dlnm_vars)) {
       pv <- pollutant_lin_dlnm_vars[i]
-      cat(sprintf("  [污染物线性distributed-lag %d/%d] %s\n", i, length(pollutant_lin_dlnm_vars), pv))
 
       rr <- run_pollutant_linear_dlnm_analysis(
         df = df_sub,
@@ -3245,13 +3221,6 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
   pollutant_meta_df <- if (length(pollutant_meta_list) > 0) bind_rows(pollutant_meta_list) else tibble()
   pollutant_fail_df <- if (length(pollutant_fail_list) > 0) bind_rows(pollutant_fail_list) else tibble()
 
-  write.csv(pollutant_lag_all_df, file.path(sub_output_dir, paste0("污染物线性distributedlag_全部lag效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(pollutant_lag_report_df, file.path(sub_output_dir, paste0("污染物线性distributedlag_汇报lag效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(pollutant_cum_df, file.path(sub_output_dir, paste0("污染物线性distributedlag_累计效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(pollutant_meta_df, file.path(sub_output_dir, paste0("污染物线性distributedlag_meta_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-  write.csv(pollutant_fail_df, file.path(sub_output_dir, paste0("污染物线性distributedlag_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")), row.names = FALSE)
-
-  cat("\n2E) lag2 组间异质性检验（CLOGIT）...\n")
 
   lag2_group_test_list <- list()
   lag2_group_test_fail_list <- list()
@@ -3272,15 +3241,12 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
       if (length(parts) >= 2) {
         current_group_var <- parts[2]
         group_vars_exist_local <- setdiff(group_vars_exist_local, current_group_var)
-        cat("  当前为分组子集，已排除当前分层变量自身的交互检验: ", current_group_var, "\n", sep = "")
       }
     }
 
-    cat("  本子集实际纳入 lag2 交互检验的分组变量数: ", length(group_vars_exist_local), "\n", sep = "")
 
     if (length(flu_exposure_vars) > 0 && length(group_vars_exist_local) > 0) {
       for (gv in group_vars_exist_local) {
-        cat("  [lag2组检验][流感] 分组变量: ", gv, "\n", sep = "")
 
         for (v in flu_exposure_vars) {
           n_lag2_try <- n_lag2_try + 1
@@ -3414,7 +3380,6 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
 
     if (length(env_vars_for_lag2_test) > 0 && length(group_vars_exist_local) > 0) {
       for (gv in group_vars_exist_local) {
-        cat("  [lag2组检验][环境] 分组变量: ", gv, "\n", sep = "")
 
         for (v in env_vars_for_lag2_test) {
           n_lag2_try <- n_lag2_try + 1
@@ -3602,12 +3567,8 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
       arrange(model_family, variable, group_var, group_level)
   }
 
-  cat("  lag2检验总尝试次数: ", n_lag2_try, "\n", sep = "")
-  cat("  lag2成功次数: ", n_lag2_ok, "\n", sep = "")
-  cat("  lag2失败次数: ", n_lag2_fail, "\n", sep = "")
 
   if (nrow(lag2_group_test_fail_df) > 0 && "reason" %in% names(lag2_group_test_fail_df)) {
-    cat("  lag2失败原因频数（前10个）:\n")
     print(
       lag2_group_test_fail_df %>%
         count(reason, sort = TRUE) %>%
@@ -3615,91 +3576,8 @@ run_dual_strategy_analysis <- function(df_sub, subset_tag,
     )
   }
 
-  write.csv(
-    lag2_group_test_df,
-    file.path(sub_output_dir, paste0("lag2_组间异质性检验_", subset_tag, "_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
 
-  write.csv(
-    lag2_group_test_fail_df,
-    file.path(sub_output_dir, paste0("lag2_组间异质性检验_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_group_or_detail_df,
-    file.path(sub_output_dir, paste0("lag2_组间异质性检验_分层OR明细表_", subset_tag, "_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_group_or_detail_fail_df,
-    file.path(sub_output_dir, paste0("lag2_组间异质性检验_分层OR明细表_失败日志_", subset_tag, "_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  report <- c(
-    "=== Case-crossover dual-strategy analysis adapted to new Python output ===",
-    paste("生成日期:", as.character(Sys.Date())),
-    paste("Subset:", subset_tag),
-    paste("Control strategy:", CONTROL_STRATEGY),
-    paste("数据文件:", data_path),
-    paste("输出目录:", sub_output_dir),
-    paste("Strata variable:", STRATA_VAR),
-    paste("Cluster variable:", ifelse(is.null(cluster_var), "NULL", cluster_var)),
-    "",
-    "本版关键修改：",
-    "1) 流感主暴露模型统一加入 holiday 调整",
-    "2) 环境模型只调整 阳性率_avg_lag0_2，不再同时调整 阳性数_avg_lag0_2",
-    "3) 不再做主lag筛选；全部 lag 结果均完整保留",
-    "4) 温度保留非线性 DLNM",
-    "5) 支持 all / heating / non_heating / prespecified subgroup 子集",
-    "6) CLOGIT lag2 使用组间异质性检验（interaction / LRT）",
-    "",
-    "Heating-season split for Changchun:",
-    "Heating season: October 20 to April 6",
-    "Non-heating season: remaining dates",
-    "",
-    "COVID major-wave binary covariate:",
-    "  - 1 = 2020-01-01 to 2020-05-31, and 2022-03-01 to 2023-01-31",
-    "  - 0 = remaining periods",
-    "",
-    "Strategy A: Influenza as primary exposure",
-    paste("Flu primary exposures:", paste(flu_exposure_vars, collapse = ", ")),
-    paste("Flu model adjustment:",
-          paste0("ns(", FLU_TEMP_AVG_COL, ",", FLU_TEMP_DF, ") + ns(", FLU_RHUM_AVG_COL, ",", FLU_RHUM_DF, ") + public_holiday"),
-          if (RUN_COVID_WAVE_ADJUST) "+ covid_major_wave" else ""),
-    "Flu analyses: CLOGIT lag0-7 + prespecified aggregate exposures + lag2 interaction test",
-    "",
-    "Strategy B: Environmental exposures as primary exposure",
-    paste("Environmental primary exposures:", paste(env_exposure_vars, collapse = ", ")),
-    "Environmental adjustment rule:",
-    "  - Pollutants and PRES: ns(Tavg_avg_lag0_2, 6) + ns(RHUM_avg_lag0_2, 3) + public_holiday + covid_major_wave + 阳性率_avg_lag0_2",
-    "  - Temperature-group exposures (Tavg/Tmax/Tmin/EHT/ELT): ns(RHUM_avg_lag0_2, 3) + public_holiday + covid_major_wave + 阳性率_avg_lag0_2",
-    "  - Humidity-group exposures (RHUM/SHUM): ns(Tavg_avg_lag0_2, 6) + public_holiday + covid_major_wave + 阳性率_avg_lag0_2",
-    "  - Extreme temperature count indicators (EHT_count_lag0_2 / ELT_count_lag0_2): ns(RHUM_avg_lag0_2, 3) + public_holiday + covid_major_wave + 阳性率_avg_lag0_2",
-    paste("Environmental candidate lags:", "lag0-lag7, and moving averages lag0-1 to lag0-7"),
-    "Temperature secondary model: nonlinear DLNM (lag 0-21)",
-    "Environmental lag2 interaction: CLOGIT lag2 with exposure × group_var",
-    "",
-    "Outputs:",
-    paste0("1) 流感主暴露_CLOGIT_lag0-7_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("2) 环境主暴露_CLOGIT_all_lags_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("3) 温度非线性DLNM_总体累积效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv"),
-    paste0("4) lag2_组间异质性检验_", subset_tag, "_", CONTROL_STRATEGY, ".csv")
-  )
-
-  writeLines(report, file.path(sub_output_dir, paste0("分析报告_dual_strategy_", subset_tag, "_", CONTROL_STRATEGY, ".txt")))
-
-  cat("\n子集全部完成。\n")
-  cat("当前子集: ", subset_tag, "\n")
-  cat("优先看：\n")
-  cat(" - ", paste0("流感主暴露_CLOGIT_lag0-7_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("环境主暴露_CLOGIT_all_lags_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("温度非线性DLNM_总体累积效应_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("lag2_组间异质性检验_", subset_tag, "_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-
+  
   invisible(list(
     subset_tag = subset_tag,
     flu_clogit_df = flu_clogit_df,
@@ -3727,7 +3605,6 @@ combine_final_tables <- function(result_list, output_dir_base = output_dir) {
 
   valid_res <- result_list[!vapply(result_list, is.null, logical(1))]
   if (length(valid_res) == 0) {
-    cat("没有可汇总的结果。\n")
     return(NULL)
   }
 
@@ -4083,91 +3960,7 @@ combine_final_tables <- function(result_list, output_dir_base = output_dir) {
       count(model_family, reason, sort = TRUE)
   }
 
-  write.csv(
-    env_alllags_combined,
-    file.path(summary_dir, paste0("汇总_环境主暴露_全部lag_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    flu_clogit_combined,
-    file.path(summary_dir, paste0("汇总_流感主暴露_CLOGIT_lag0-7_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    flu_dlnm_cum_combined,
-    file.path(summary_dir, paste0("汇总_流感主暴露_DLNM_cumulative_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    temp_nl_overall_combined,
-    file.path(summary_dir, paste0("汇总_温度非线性DLNM_总体累积效应_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    pollutant_cum_combined,
-    file.path(summary_dir, paste0("汇总_污染物线性distributedlag_累计效应_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    final_key_summary,
-    file.path(summary_dir, paste0("汇总_最终重点结果总表_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_summary,
-    file.path(summary_dir, paste0("汇总_lag2总结表_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_group_test_combined,
-    file.path(summary_dir, paste0("汇总_lag2组间异质性检验_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_group_test_fail_combined,
-    file.path(summary_dir, paste0("汇总_lag2组间异质性检验_失败日志_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_group_or_detail_combined,
-    file.path(summary_dir, paste0("汇总_lag2组间异质性检验_分层OR明细表_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_group_or_detail_fail_combined,
-    file.path(summary_dir, paste0("汇总_lag2组间异质性检验_分层OR明细表_失败日志_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  write.csv(
-    lag2_fail_reason_summary,
-    file.path(summary_dir, paste0("汇总_lag2组间异质性检验_失败原因频数_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv")),
-    row.names = FALSE
-  )
-
-  cat("\n=============================\n")
-  cat("全部子集最终结果已汇总完成\n")
-  cat("输出目录: ", summary_dir, "\n", sep = "")
-  cat("重点看这几个总表:\n")
-  cat(" - ", paste0("汇总_最终重点结果总表_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("汇总_lag2总结表_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("汇总_lag2组间异质性检验_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("汇总_lag2组间异质性检验_分层OR明细表_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("汇总_lag2组间异质性检验_失败日志_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("汇总_lag2组间异质性检验_分层OR明细表_失败日志_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat(" - ", paste0("汇总_lag2组间异质性检验_失败原因频数_all-heating-nonheating-groups_", CONTROL_STRATEGY, ".csv"), "\n", sep = "")
-  cat("=============================\n")
-
+  
   invisible(list(
     env_alllags_combined = env_alllags_combined,
     flu_clogit_combined = flu_clogit_combined,
@@ -4186,14 +3979,13 @@ combine_final_tables <- function(result_list, output_dir_base = output_dir) {
   ))
 }
 
-cat("1) 读取数据...\n")
-cat("当前策略文件: ", data_path, "\n")
+
 df <- read_csv(data_path, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
 if (nzchar(EXCLUDE_CENTRE)) {
   if (!(CENTRE_VAR %in% names(df))) stop(paste0("Missing centre column: ", CENTRE_VAR))
   df <- df %>% filter(as.character(.data[[CENTRE_VAR]]) != EXCLUDE_CENTRE)
 }
-cat("数据维度: ", nrow(df), " x ", ncol(df), "\n")
+
 
 pres_cols <- grep("^PRES(_lag[0-9]+|_avg_lag0_[0-9]+|_max_lag0_[0-9]+)?$", names(df), value = TRUE)
 
@@ -4209,7 +4001,6 @@ if (length(pres_cols) > 0) {
       df[[col]] <- x
     }
   }
-  cat("PRES相关列单位检查完成；由 Pa 转换为 hPa 的列数: ", length(converted), "\n")
 }
 
 lag0_cols_all <- names(df)[grepl("_lag0$", names(df))]
@@ -4229,14 +4020,6 @@ global_iqr_df <- tibble(
 ) %>%
   arrange(group, variable)
 
-write.csv(
-  global_iqr_df,
-  file.path(output_dir, paste0("全样本固定IQR注册表_", CONTROL_STRATEGY, ".csv")),
-  row.names = FALSE
-)
-
-cat("全样本固定 IQR 注册表已生成。\n")
-cat("可用IQR变量数: ", sum(is.finite(global_iqr_df$global_iqr)), "\n")
 
 stopifnot(OUTCOME_VAR %in% names(df))
 stopifnot(STRATA_VAR %in% names(df))
@@ -4248,16 +4031,14 @@ if (RUN_COVID_WAVE_ADJUST) {
   df <- add_covid_major_wave_flag(df, date_var = EVENT_DATE_VAR, out_var = COVID_WAVE_VAR)
 }
 
-cat("事件日缺失数: ", sum(is.na(df$event_date)), "\n")
-cat("供暖季分布:\n")
+
 print(table(df$heating_season, useNA = "ifany"))
 
 if (RUN_COVID_WAVE_ADJUST) {
-  cat("COVID大流行期分布:\n")
   print(table(df[[COVID_WAVE_VAR]], useNA = "ifany"))
 }
 
-cat("事件日示例:\n")
+
 print(head(df %>% select(all_of(EVENT_DATE_VAR), event_date, heating_season,
                          any_of(COVID_WAVE_VAR)), 10))
 
@@ -4273,15 +4054,10 @@ if (isTRUE(RUN_HEATING_STRATIFIED)) {
   subset_levels <- c("heating", "non_heating")
 
   for (ss in subset_levels) {
-    cat("\n----------------------------------\n")
-    cat("准备分析子集: ", ss, "\n")
-    cat("----------------------------------\n")
 
     df_ss <- df %>% filter(heating_season == ss)
 
-    cat("记录数: ", nrow(df_ss), "\n")
-    cat("病例数: ", sum(df_ss[[OUTCOME_VAR]] == 1, na.rm = TRUE), "\n")
-    cat("对照数: ", sum(df_ss[[OUTCOME_VAR]] == 0, na.rm = TRUE), "\n")
+
 
     if (nrow(df_ss) == 0) {
       cat("该子集无数据，跳过。\n")
@@ -4296,29 +4072,20 @@ if (isTRUE(RUN_HEATING_STRATIFIED)) {
         output_dir_base = output_dir
       )
     }, error = function(e) {
-      cat("子集分析失败: ", ss, " | ", e$message, "\n")
       NULL
     })
   }
 }
 
 if (isTRUE(RUN_GROUP_STRATIFIED)) {
-  cat("\n====================================\n")
-  cat("开始按 A-E 分组变量批量分层分析\n")
-  cat("说明：仅改变分析子集，不改变任何暴露-反应模型设定\n")
-  cat("====================================\n")
 
   group_vars_exist <- ANALYSIS_GROUP_VARS[ANALYSIS_GROUP_VARS %in% names(df)]
 
-  cat("检测到的分组变量:\n")
   print(group_vars_exist)
 
   group_registry <- list()
 
   for (gv in group_vars_exist) {
-    cat("\n----------------------------------\n")
-    cat("分组变量: ", gv, " | ", add_group_var_label(gv), "\n", sep = "")
-    cat("----------------------------------\n")
 
     valid_levels <- get_valid_group_levels(
       df = df,
@@ -4330,7 +4097,6 @@ if (isTRUE(RUN_GROUP_STRATIFIED)) {
     )
 
     if (nrow(valid_levels) == 0) {
-      cat("无满足条件的分组水平，跳过。\n")
       next
     }
 
@@ -4341,18 +4107,15 @@ if (isTRUE(RUN_GROUP_STRATIFIED)) {
       gl <- valid_levels$group_level[ii]
 
       subset_tag <- make_group_subset_tag(gv, gl, prefix = "group")
-      cat("\n准备分析分组子集: ", subset_tag, "\n", sep = "")
+
 
       df_g <- df %>%
         filter(!is.na(.data[[gv]])) %>%
         filter(as.character(.data[[gv]]) == as.character(gl))
 
-      cat("记录数: ", nrow(df_g), "\n")
-      cat("病例数: ", sum(df_g[[OUTCOME_VAR]] == 1, na.rm = TRUE), "\n")
-      cat("对照数: ", sum(df_g[[OUTCOME_VAR]] == 0, na.rm = TRUE), "\n")
+
 
       if (nrow(df_g) == 0) {
-        cat("该分组子集无数据，跳过。\n")
         all_results[[subset_tag]] <- NULL
         next
       }
@@ -4371,7 +4134,6 @@ if (isTRUE(RUN_GROUP_STRATIFIED)) {
         }
         rr
       }, error = function(e) {
-        cat("分组子集分析失败: ", subset_tag, " | ", e$message, "\n")
         NULL
       })
     }
@@ -4468,37 +4230,6 @@ if (length(group_valid_res) > 0) {
         left_join(meta, by = "subset")
     })
   )
-
-  write.csv(group_meta_df,
-            file.path(group_summary_dir, paste0("分组分析_meta_", CONTROL_STRATEGY, ".csv")),
-            row.names = FALSE)
-
-  write.csv(group_env_alllags,
-            file.path(group_summary_dir, paste0("分组分析_环境主暴露_全部lag_", CONTROL_STRATEGY, ".csv")),
-            row.names = FALSE)
-
-  write.csv(group_flu_dlnm_cum,
-            file.path(group_summary_dir, paste0("分组分析_流感DLNM累计效应_", CONTROL_STRATEGY, ".csv")),
-            row.names = FALSE)
-
-  write.csv(group_temp_nl,
-            file.path(group_summary_dir, paste0("分组分析_温度非线性DLNM_", CONTROL_STRATEGY, ".csv")),
-            row.names = FALSE)
-
-  write.csv(group_pollutant_cum,
-            file.path(group_summary_dir, paste0("分组分析_污染物线性distributedlag累计效应_", CONTROL_STRATEGY, ".csv")),
-            row.names = FALSE)
-
-  cat("\n分组分析汇总完成。\n")
-  cat("输出目录: ", group_summary_dir, "\n")
-}
-
-cat("\n全部完成。\n")
-cat("总输出目录: ", output_dir, "\n")
-cat("包含子目录:\n")
-cat(" - all\n")
-cat(" - heating\n")
-cat(" - non_heating\n")
 cat(" - summary_combined\n")
 cat(" - summary_groups\n")
 cat(" - group__*\n")
