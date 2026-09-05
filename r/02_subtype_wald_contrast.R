@@ -344,11 +344,8 @@ run_h1n1_h3n2_lag2 <- function(df, subset_tag,
 }
 
 
-cat("1) 读取数据...\n")
-cat("当前策略文件: ", data_path, "\n")
 
 df <- read_csv(data_path, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
-cat("数据维度: ", nrow(df), " x ", ncol(df), "\n")
 
 stopifnot(OUTCOME_VAR %in% names(df))
 stopifnot(STRATA_VAR %in% names(df))
@@ -362,11 +359,10 @@ if (RUN_COVID_WAVE_ADJUST) {
 
 df <- normalize_calendar_covariates(df)
 
-cat("供暖季分布:\n")
+
 print(table(df$heating_season, useNA = "ifany"))
 
 if (RUN_COVID_WAVE_ADJUST) {
-  cat("COVID大流行期分布:\n")
   print(table(df[[COVID_WAVE_VAR]], useNA = "ifany"))
 }
 
@@ -376,15 +372,10 @@ result_list[["all"]] <- run_h1n1_h3n2_lag2(df, subset_tag = "all")
 
 if (isTRUE(RUN_HEATING_STRATIFIED)) {
   for (ss in c("heating", "non_heating")) {
-    cat("\n----------------------------------\n")
-    cat("准备分析子集: ", ss, "\n")
-    cat("----------------------------------\n")
+
 
     df_ss <- df %>% filter(heating_season == ss)
 
-    cat("记录数: ", nrow(df_ss), "\n")
-    cat("病例数: ", sum(df_ss[[OUTCOME_VAR]] == 1, na.rm = TRUE), "\n")
-    cat("对照数: ", sum(df_ss[[OUTCOME_VAR]] == 0, na.rm = TRUE), "\n")
 
     if (nrow(df_ss) == 0) {
       warning(paste0("子集 ", ss, " 无数据，跳过。"))
@@ -442,11 +433,4 @@ supp_table_min <- summary_df %>%
     Interpretation = interpretation
   )
 
-write.csv(
-  supp_table_min,
-  file.path(output_dir, "H1N1_vs_H3N2_lag2_正式差异检验_极简表.csv"),
-  row.names = FALSE
-)
-cat("总输出目录: ", output_dir, "\n")
-cat("重点文件：\n")
-cat(" - H1N1_vs_H3N2_lag2_正式差异检验_极简表.csv\n")
+
